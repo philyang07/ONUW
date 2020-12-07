@@ -1,8 +1,24 @@
+import java.util.function.BiPredicate;
+import java.util.function.Predicate;
+
 public class Player {
     private String name;
     private Player votedPlayer;
+    private Role oldRole;
+    private Role newRole;
+
     private final ClientThread clientThread;
 
+    public Role getOldRole() {
+        return oldRole;
+    }
+
+    // Returns new role if they have a new role, otherwise, return old role
+    public Role getNewRole() {
+        if (newRole == null)
+            return oldRole;
+        return newRole;
+    }
 
     public String getName() {
         return name;
@@ -12,14 +28,28 @@ public class Player {
         return votedPlayer;
     }
 
+    public void setOldRole(Role oldRole) {
+        this.oldRole = oldRole;
+    }
+
+    public void setNewRole(Role newRole) {
+        this.newRole = newRole;
+    }
+
     public Player(ClientThread ct) {
         clientThread = ct;
         name = null;
         votedPlayer = null;
+        oldRole = null;
+        newRole = null;
     }
 
     public void startVoting() {
         clientThread.setInVoting(true);
+    }
+
+    public void stopEnteringNames() {
+        clientThread.setStillEnteringNames(false);
     }
 
     public void endVoting() {
@@ -60,5 +90,23 @@ public class Player {
         return this.clientThread.getCurrentInput();
     }
 
+    // Keep requesting the player for valid input
+    public String getValidInput(Predicate<String> validator, String errorMessage) {
+        String input = getInput();
+        while (!validator.test(input)) {
+            printToPlayer(errorMessage);
+            input = getInput();
+        }
+        return input;
+    }
+
+    public static boolean validIntFromOneToThree(String input) {
+        try {
+            int choice = Integer.parseInt(input);
+            return choice >= 1 && choice <= 3;
+        } catch (NumberFormatException nfe) {
+            return false;
+        }
+    }
 
 }
