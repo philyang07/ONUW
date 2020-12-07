@@ -12,7 +12,7 @@ public class Server {
 
     private final int portNumber;
     private final ArrayList<Player> players;
-    private final ArrayList<Role> centerRoles;
+    private ArrayList<Role> centerRoles;
 
     public void delay(int secs, boolean showHalfTime) {
         try {
@@ -90,13 +90,12 @@ public class Server {
     public Server(int portNumber) {
         this.portNumber = portNumber;
         this.players = new ArrayList<>();
-        this.centerRoles = new ArrayList<>();
 
         acceptConnections();
         assignRoles();
         printRoles();
-        performNightActions();
-        discussion();
+        voting();
+        results();
         printRoles();
 
         while (true) {}
@@ -125,26 +124,23 @@ public class Server {
             for (Player p : players) {
                 p.stopEnteringNames();
             }
-
-
-
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
     public void assignRoles() {
-        // Assign the roles to the players
-        Role[] roles = {Role.WEREWOLF, Role.MINION, Role.INSOMNIAC, Role.ROBBER, Role.DRUNK, Role.TROUBLEMAKER, Role.SEER, Role.VILLAGER};
+        // Determine the role list (must be three more than the no. of players)
+        Role[] roles = {Role.WEREWOLF, Role.MINION, Role.TANNER, Role.ROBBER, Role.DRUNK, Role.TROUBLEMAKER, Role.SEER, Role.VILLAGER};
         List<Role> roleList = Arrays.asList(roles);
-        players.get(0).setOldRole(roleList.get(0));
-        players.get(1).setOldRole(roleList.get(1));
-        players.get(2).setOldRole(roleList.get(2));
-        players.get(3).setOldRole(roleList.get(3));
-        players.get(4).setOldRole(roleList.get(4));
-        centerRoles.add(roleList.get(5));
-        centerRoles.add(roleList.get(6));
-        centerRoles.add(roleList.get(7));
+
+        // Assign to the players based on the role list
+        Collections.shuffle(roleList);
+        int i = 0;
+        for (Player player : players) {
+            player.setOldRole(roleList.get(i++));
+        }
+        centerRoles = new ArrayList<>(roleList.subList(players.size(), roleList.size()));
 
         // Tell the players what their role is
         for (Player player : players)
@@ -161,9 +157,7 @@ public class Server {
         troublemakerAction();
         drunkAction();
         insomniacAction();
-    }
-
-    public void performDayActions() {
+        printToAllExcept(null, "Everyone. Open your eyes.");
 
     }
 
@@ -203,11 +197,16 @@ public class Server {
         printToAllExcept(null, "Everyone's roles are:");
         for (Player player : players)
             printToAllExcept(null, player.getName() + ": " + player.getNewRole().getName());
+        printToAllExcept(null, "The center roles are:");
+        for (Role role : centerRoles)
+            printToAllExcept(null, role.getName());
     }
 
     public void results() {
         HashMap<Player, Integer> voteCounts = new HashMap<>();
         ArrayList<Player> currentWerewolves = new ArrayList<>();
+        ArrayList<Player> tanners = getPlayersByRoleName("Tanner", true);
+
         for (Player player : players) {
             if (player.getNewRole() == Role.WEREWOLF) {
                 currentWerewolves.add(player);
@@ -215,7 +214,8 @@ public class Server {
             voteCounts.put(player, 0);
         }
         for (Player player : players) {
-            voteCounts.put(player.getVotedPlayer(), voteCounts.get(player.getVotedPlayer())+1);
+            if (player.getVotedPlayer() != null)
+                voteCounts.put(player.getVotedPlayer(), voteCounts.get(player.getVotedPlayer())+1);
         }
         int maxVotes = Collections.max(voteCounts.values());
         List<Player> votedOutPlayers = voteCounts.entrySet().stream()
@@ -231,6 +231,8 @@ public class Server {
             } else {
                 printToAllExcept(null, "There are no werewolves in the game so the village wins!");
             }
+            if (tanners.size() > 0)
+                tanners.get(0).printToPlayer("You didn't die and so you didn't win...");
         } else {
             // Hunter action (assume swapping into hunter counts)
             if (votedOutPlayers.stream().map(Player::getNewRole).filter(i -> i == Role.HUNTER).count() == 1) {
@@ -248,12 +250,14 @@ public class Server {
                 }
             }
 
-            if (currentWerewolves.stream().filter(deadPlayers::contains).count() > 0) {
+            if (currentWerewolves.stream().anyMatch(deadPlayers::contains)) {
                 printToAllExcept(null, "At least one werewolf died! Villagers win!");
             } else {
                 printToAllExcept(null, "No werewolves died! Werewolves win!");
             }
 
+            if (tanners.size() > 0 && deadPlayers.contains(tanners.get(0)))
+                printToAllExcept(null, "The tanner '" + tanners.get(0).getName() + "' died, so they win!");
         }
 
 

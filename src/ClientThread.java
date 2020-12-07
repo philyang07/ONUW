@@ -69,7 +69,8 @@ public class ClientThread extends Thread {
             if (server.validPlayerName(input) && server.getPlayer(input) != player) {
                 player.setVotedPlayer(server.getPlayer(input));
                 player.printToPlayer("You voted for " + input + ". Type /unvote to remove your vote.");
-            } else if (input.equals("/unvote")) {
+            } else if (input.equals("/unvote") && player.getVotedPlayer() != null) {
+                player.printToPlayer("You removed your vote for " + player.getVotedPlayer().getName() + ".");
                 player.setVotedPlayer(null);
             } else {
                 player.printToPlayer("Invalid name provided.");
