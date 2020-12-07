@@ -1,4 +1,3 @@
-import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 
 public class Player {
@@ -79,7 +78,7 @@ public class Player {
     public String getInput() {
         String oldInput = this.clientThread.getCurrentInput();
         // Wait until found
-        while (this.clientThread.getCurrentInput().equals(oldInput)) {
+        while (this.clientThread.getCurrentInput().equals(oldInput) || this.clientThread.getCurrentInput().charAt(0) == '/') { // Ignore inputs that begin with a '/'
             // Just do something while waiting...
             try {
                 Thread.sleep(50);
@@ -107,6 +106,10 @@ public class Player {
         } catch (NumberFormatException nfe) {
             return false;
         }
+    }
+
+    public static boolean validYesOrNo(String input) {
+        return input.toLowerCase().equals("y") || input.toLowerCase().equals("yes") || input.toLowerCase().equals("n") || input.toLowerCase().equals("no");
     }
 
 }

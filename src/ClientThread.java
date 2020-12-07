@@ -74,7 +74,7 @@ public class ClientThread extends Thread {
             }
         } else if (stillEnteringNames) {
             // Check if input matches "/name <name>"
-            if (input.matches("\\/name [a-zA-z0-9][a-zA-Z0-9 ]*")) {
+            if (input.matches("/name [a-zA-z0-9][a-zA-Z0-9 ]*")) {
                 String nameCandidate = input.substring(6).stripTrailing();
                 if (nameCandidate.equals(player.getName())) {
                     player.printToPlayer("Name provided is same as original.");

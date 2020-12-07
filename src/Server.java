@@ -2,12 +2,13 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.Arrays;
 
 public class Server {
     public static final int DISCUSSION_DURATION = 20;
     public static final int VOTING_DURATION = 20;
     public static final int ADDITIONAL_NAME_ENTERING_TIME = 10;
-    public static final int NUM_PLAYERS = 3;
+    public static final int NUM_PLAYERS = 5;
 
     private final int portNumber;
     private final ArrayList<Player> players;
@@ -77,13 +78,13 @@ public class Server {
     }
 
     public String getAllPlayerNames() {
-        String playerNames = "";
+        StringBuilder playerNames = new StringBuilder();
         for (Player player : players.subList(0, players.size()-1)) {
-            playerNames += player.getName();
-            playerNames += ", ";
+            playerNames.append(player.getName());
+            playerNames.append(", ");
         }
-        playerNames += players.get(players.size()-1).getName();
-        return playerNames;
+        playerNames.append(players.get(players.size() - 1).getName());
+        return playerNames.toString();
     }
 
     public Server(int portNumber) {
@@ -92,7 +93,9 @@ public class Server {
         this.centerRoles = new ArrayList<>();
 
         acceptConnections();
-        voting();
+        assignRoles();
+        printRoles();
+
         while (true) {}
     }
 
@@ -128,10 +131,22 @@ public class Server {
     }
 
     public void assignRoles() {
+        // Assign the roles to the players
+        Role[] roles = {Role.WEREWOLF, Role.WEREWOLF, Role.MINION, Role.MASON, Role.MASON, Role.SEER, Role.ROBBER, Role.TROUBLEMAKER};
+        ArrayList<Role> roleList = (ArrayList<Role>) Arrays.asList(roles);
+        players.get(0).setOldRole(roleList.get(0));
+        players.get(1).setOldRole(roleList.get(1));
+        players.get(2).setOldRole(roleList.get(2));
+        players.get(3).setOldRole(roleList.get(3));
+        players.get(4).setOldRole(roleList.get(4));
 
+        // Tell the players what their role is
+        for (Player player : players)
+            player.printToPlayer("Your role is " + player.getNewRole() + ".");
     }
 
     public void performNightActions() {
+        printToAllExcept(null, "Everyone. Close your eyes.");
 
     }
 
@@ -170,8 +185,169 @@ public class Server {
         }
     }
 
+    public void printRoles() {
+        printToAllExcept(null, "Everyone's roles are:");
+        for (Player player : players)
+            printToAllExcept(null, player.getName() + ": " + player.getNewRole().getName());
+    }
     public void results() {
 
+    }
+
+    public void werewolfAction() {
+        printToAllExcept(null, "Werewolves, open your eyes.");
+
+        ArrayList<Player> werewolves = getPlayersByRoleName("Werewolf", false);
+        if (werewolves.size() == 1) {
+            Player werewolfPlayer = werewolves.get(0);
+            werewolfPlayer.printToPlayer("You are the lone wolf. Would you like to view a center card? (y/n)");
+            String choice = werewolfPlayer.getValidInput(Player::validYesOrNo, "Must be y/n or yes/no");
+            if (choice.equals("y") || choice.equals("yes")) {
+                werewolfPlayer.printToPlayer("Which card would you like to view (1-3)?");
+                // Get a valid selection from the werewolf
+                int selection = Integer.parseInt(werewolfPlayer.getValidInput(Player::validIntFromOneToThree, "Must be an integer from 1 to 3."));
+                System.out.println("The role on the card is " + getCenterRoles().get(selection-1).getName());
+            }
+        } else {
+            if (werewolves.size() == 2) {
+                for (Player werewolfPlayer : werewolves) {
+                    werewolfPlayer.printToPlayer("There are two werewolves. The other werewolf is " + werewolves.get(1-werewolves.indexOf(werewolfPlayer)).getName() + ".");
+                }
+            }
+            delay(Role.WEREWOLF.getTurnTime(), false);
+        }
+
+        printToAllExcept(null, "Werewolves, close your eyes.");
+    }
+
+    public void minionAction() {
+        printToAllExcept(null, "Minion, open your eyes.");
+
+        ArrayList<Player> minions = getPlayersByRoleName("Minions", false);
+        ArrayList<Player> werewolves = getPlayersByRoleName("Werewolf", false);
+
+        if (minions.size() > 0) {
+            Player minionPlayer = minions.get(0);
+            if (werewolves.size() > 0) {
+                minionPlayer.printToPlayer("The werewolves are:");
+                for (Player player : werewolves) {
+                    minionPlayer.printToPlayer((werewolves.indexOf(player)+1) + ". " + player.getName());
+                }
+            } else {
+                minionPlayer.printToPlayer("There are no werewolves in the game. You win if a villager dies.");
+            }
+        }
+        delay(Role.MINION.getTurnTime(), false);
+        printToAllExcept(null, "Minion, close your eyes.");
+    }
+
+    public void masonAction() {
+        printToAllExcept(null, "Masons, open your eyes.");
+
+        ArrayList<Player> masons = getPlayersByRoleName("Mason", false);
+        if (masons.size() == 1) {
+            Player masonPlayer = masons.get(0);
+            masonPlayer.printToPlayer("You are the only mason.");
+        } else if (masons.size() == 2) {
+            for (Player masonPlayer : masons) {
+                masonPlayer.printToPlayer("There are two masons. The other mason is " + masons.get(1-masons.indexOf(masonPlayer)).getName() + ".");
+            }
+        }
+        delay(Role.MASON.getTurnTime(), false);
+        printToAllExcept(null, "Masons, close your eyes.");
+    }
+
+    public void seerAction() {
+        printToAllExcept(null, "Seer. Open your eyes.");
+        ArrayList<Player> seers = getPlayersByRoleName("Seer", false);
+        if (seers.size() > 0) {
+            Player seerPlayer = seers.get(0);
+            seerPlayer.printToPlayer("Do you want to view a card from the center or another player's card (center/player");
+            boolean chooseFromCenter = seerPlayer.getValidInput(input -> input.toLowerCase().equals("center") || input.toLowerCase().equals("player"), "Type 'center' or 'player'").equals("center");
+            if (chooseFromCenter) {
+                seerPlayer.printToPlayer("What card from the center would you like to view? (1-3)");
+                int selection = Integer.parseInt(seerPlayer.getValidInput(Player::validIntFromOneToThree, "Must be an integer from 1 to 3."));
+                System.out.println("The role on the card is " + getCenterRoles().get(selection-1).getName());
+            } else {
+                seerPlayer.printToPlayer("Who's role do you want revealed? Type /players to see the list of players.");
+                Player candidatePlayer = getPlayerFromInputExceptThemselves(seerPlayer);
+                System.out.println(candidatePlayer + "'s role is " + candidatePlayer.getNewRole().getName());
+            }
+        } else {
+            delay(Role.SEER.getTurnTime(), false);
+        }
+        printToAllExcept(null, "Seer. Close your eyes.");
+    }
+
+
+    public void robberAction() {
+        printToAllExcept(null, "Robber. Open your eyes.");
+        ArrayList<Player> robbers = getPlayersByRoleName("Robber", false);
+        if (robbers.size() > 0) {
+            Player robberPlayer = robbers.get(0);
+            robberPlayer.printToPlayer("Choose a player to swap your role with. Type /players to view who the other players are.");
+            Player candidatePlayer = getPlayerFromInputExceptThemselves(robberPlayer);
+
+            // Swap the new roles
+            robberPlayer.setNewRole(candidatePlayer.getNewRole());
+            candidatePlayer.setNewRole(robberPlayer.getNewRole());
+
+            robberPlayer.printToPlayer("Your new role is " + robberPlayer.getNewRole().getName());
+
+        } else {
+            delay(Role.ROBBER.getTurnTime(), false);
+        }
+        printToAllExcept(null, "Robber. Close your eyes.");
+    }
+
+    public void troublemakerAction() {
+        printToAllExcept(null, "Troublemaker. Open your eyes.");
+        ArrayList<Player> troublemakers = getPlayersByRoleName("troublemaker", false);
+        if (troublemakers.size() > 0) {
+            Player troublemakerPlayer = troublemakers.get(0);
+            // Choose first player
+            troublemakerPlayer.printToPlayer("Choose the first player. Type /players to view who the other players are.");
+            Player firstPlayer = getPlayerFromInputExceptThemselves(troublemakerPlayer);
+            // Choose the second player
+            troublemakerPlayer.printToPlayer("Choose the second player. Type /players to view who the other players are.");
+            String candidatePlayerName = troublemakerPlayer.getInput();
+            while (candidatePlayerName.equals(firstPlayer.getName()) || candidatePlayerName.equals(troublemakerPlayer.getName()) || !validPlayerName(candidatePlayerName)) {
+                troublemakerPlayer.printToPlayer("Invalid selection. Type /players to view who the players are.");
+                candidatePlayerName = troublemakerPlayer.getInput();
+            }
+            Player secondPlayer = getPlayer(candidatePlayerName);
+            // Swap the players' roles
+            firstPlayer.setNewRole(secondPlayer.getNewRole());
+            secondPlayer.setNewRole(firstPlayer.getNewRole());
+            troublemakerPlayer.printToPlayer("You swapped the roles of " + firstPlayer.getName() + " and " + secondPlayer.getName());
+        } else {
+            delay(Role.TROUBLEMAKER.getTurnTime(), false);
+        }
+    }
+
+    public void drunkAction() {
+        printToAllExcept(null, "Drunk. Open your eyes.");
+        ArrayList<Player> drunks = getPlayersByRoleName("Drunk", false);
+        if (drunks.size() > 0) {
+            Player drunkPlayer = drunks.get(0);
+            drunkPlayer.printToPlayer("What card from the center would you like to view? (1-3)");
+            int selection = Integer.parseInt(drunkPlayer.getValidInput(Player::validIntFromOneToThree, "Must be an integer from 1 to 3."));
+            System.out.println("The role on the card is " + getCenterRoles().get(selection-1).getName());
+
+        }
+        delay(Role.DRUNK.getTurnTime(), false);
+        printToAllExcept(null, "Drunk. Close your eyes.");
+    }
+
+    public void insomniacAction() {
+        printToAllExcept(null, "Insomniac. Open your eyes.");
+        ArrayList<Player> insomniacs = getPlayersByRoleName("Insomniac", false);
+        if (insomniacs.size() > 0) {
+            Player insomniacPlayer = insomniacs.get(0);
+            insomniacPlayer.printToPlayer("Your current role is " + insomniacPlayer.getNewRole().getName());
+        }
+        delay(Role.INSOMNIAC.getTurnTime(), false);
+        printToAllExcept(null, "Insomniac. Close your eyes.");
     }
 
     public static void main(String[] args) {
