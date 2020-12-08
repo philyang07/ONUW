@@ -4,6 +4,7 @@ public class Player {
     private String name;
     private Player votedPlayer;
     private Role oldRole;
+    private boolean isDoppelgangerRobber; // Very special instance, to make sure doesn't wake up during mason/werewolf times
     private Role newRole;
 
     private final ClientThread clientThread;
@@ -17,6 +18,14 @@ public class Player {
         if (newRole == null)
             return oldRole;
         return newRole;
+    }
+
+    public boolean isDoppelgangerRobber() {
+        return isDoppelgangerRobber;
+    }
+
+    public void setDoppelgangerRobber(boolean doppelgangerRobber) {
+        isDoppelgangerRobber = doppelgangerRobber;
     }
 
     public String getName() {
@@ -41,6 +50,7 @@ public class Player {
         votedPlayer = null;
         oldRole = null;
         newRole = null;
+        isDoppelgangerRobber = false;
     }
 
     public void startVoting() {

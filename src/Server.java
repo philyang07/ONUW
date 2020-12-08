@@ -94,8 +94,7 @@ public class Server {
         acceptConnections();
         assignRoles();
         printRoles();
-        voting();
-        results();
+        performNightActions();
         printRoles();
 
         while (true) {}
@@ -131,11 +130,11 @@ public class Server {
 
     public void assignRoles() {
         // Determine the role list (must be three more than the no. of players)
-        Role[] roles = {Role.WEREWOLF, Role.MINION, Role.TANNER, Role.ROBBER, Role.DRUNK, Role.TROUBLEMAKER, Role.SEER, Role.VILLAGER};
+        Role[] roles = {Role.WEREWOLF, Role.MINION, Role.DOPPELGANGER, Role.ROBBER, Role.DRUNK, Role.TROUBLEMAKER, Role.SEER, Role.VILLAGER};
         List<Role> roleList = Arrays.asList(roles);
 
         // Assign to the players based on the role list
-        Collections.shuffle(roleList);
+//        Collections.shuffle(roleList);
         int i = 0;
         for (Player player : players) {
             player.setOldRole(roleList.get(i++));
@@ -149,16 +148,22 @@ public class Server {
 
     public void performNightActions() {
         printToAllExcept(null, "Everyone. Close your eyes.");
+        doppelgangerAction();
         werewolfAction();
-        minionAction();
+        minionAction(false);
         masonAction();
-        seerAction();
-        robberAction();
-        troublemakerAction();
-        drunkAction();
-        insomniacAction();
+        seerAction(false);
+        robberAction(false);
+        troublemakerAction(false);
+        drunkAction(false);
+        insomniacAction(false);
+        // Add doppelganger-insomniac if playing with doppelganger
+        if (getPlayersByRoleName("Doppelganger", false).size() > 0 || centerRoles.contains(Role.DOPPELGANGER)) {
+            printToAllExcept(null, "Doppelganger-insomniac. Open your eyes.");
+            insomniacAction(true);
+            printToAllExcept(null, "Doppelganger-insomniac. Close your eyes.");
+        }
         printToAllExcept(null, "Everyone. Open your eyes.");
-
     }
 
     public void discussion() {
@@ -232,21 +237,27 @@ public class Server {
                 printToAllExcept(null, "There are no werewolves in the game so the village wins!");
             }
             if (tanners.size() > 0)
-                tanners.get(0).printToPlayer("You didn't die and so you didn't win...");
+                for (Player player : tanners) // Accounting for potential doppelganger-tanner
+                    player.printToPlayer("You didn't die and so you didn't win...");
         } else {
             // Hunter action (assume swapping into hunter counts)
-            if (votedOutPlayers.stream().map(Player::getNewRole).filter(i -> i == Role.HUNTER).count() == 1) {
-                Player hunterPlayer = getPlayersByRoleName("Hunter", true).get(0);
-                printToAllExcept(null, "The hunter '" + hunterPlayer.getName() + "' was voted out!");
-                if (hunterPlayer.getVotedPlayer() != null) {
-                    printToAllExcept(null, "Their target " + hunterPlayer.getVotedPlayer() + " will also die.");
-                    if (!votedOutPlayers.contains(hunterPlayer.getVotedPlayer())) {
-                        deadPlayers.add(hunterPlayer.getVotedPlayer());
+            for (Player hunterPlayer : votedOutPlayers) {
+                if (hunterPlayer.getNewRole() == Role.HUNTER) {
+                    if (hunterPlayer.getOldRole() == Role.DOPPELGANGER) {
+                        printToAllExcept(null, "The hunter (doppelganger)'" + hunterPlayer.getName() + "' was voted out!");
                     } else {
-                        printToAllExcept(null, "However, they were already voted out.");
+                        printToAllExcept(null, "The hunter '" + hunterPlayer.getName() + "' was voted out!");
                     }
-                } else {
-                    printToAllExcept(null, "But they didn't target anyone... So no-one else dies.");
+                    if (hunterPlayer.getVotedPlayer() != null) {
+                        printToAllExcept(null, "Their target " + hunterPlayer.getVotedPlayer() + " will also die.");
+                        if (!votedOutPlayers.contains(hunterPlayer.getVotedPlayer())) {
+                            deadPlayers.add(hunterPlayer.getVotedPlayer());
+                        } else {
+                            printToAllExcept(null, "However, they were already voted out.");
+                        }
+                    } else {
+                        printToAllExcept(null, "But they didn't target anyone... So no-one else dies.");
+                    }
                 }
             }
 
@@ -256,17 +267,60 @@ public class Server {
                 printToAllExcept(null, "No werewolves died! Werewolves win!");
             }
 
+            // Tanner action
             if (tanners.size() > 0 && deadPlayers.contains(tanners.get(0)))
-                printToAllExcept(null, "The tanner '" + tanners.get(0).getName() + "' died, so they win!");
+                for (Player player : deadPlayers) {
+                    if (player.getNewRole() == Role.TANNER) {
+                        if (player.getOldRole() == Role.DOPPELGANGER) {
+                            printToAllExcept(null, "The tanner (originally doppelganger)'" + tanners.get(0).getName() + "' died, so they win!");
+                        } else {
+                            printToAllExcept(null, "The tanner '" + tanners.get(0).getName() + "' died, so they win!");
+                        }
+                    }
+                }
+        }
+    }
+
+    public void doppelgangerAction() {
+        printToAllExcept(null, "Doppelganger. Open your eyes.");
+        ArrayList<Player> doppelgangers = getPlayersByRoleName("Doppelganger", false);
+        if (doppelgangers.size() > 0) {
+            Player doppelgangerPlayer = doppelgangers.get(0);
+            doppelgangerPlayer.printToPlayer("Choose someone whose role you would like to copy. Type /players to get the list of players' names.");
+            Player candidatePlayer = getPlayerFromInputExceptThemselves(doppelgangerPlayer);
+            doppelgangerPlayer.printToPlayer("You chose " + candidatePlayer.getName() + " whose role was " + candidatePlayer.getOldRole().getName() + ".");
+            doppelgangerPlayer.setNewRole(candidatePlayer.getOldRole());
+            switch (candidatePlayer.getOldRole()) {
+                case MINION:
+                    minionAction(true);
+                    break;
+                case SEER:
+                    seerAction(true);
+                    break;
+                case ROBBER:
+                    doppelgangerPlayer.setDoppelgangerRobber(true);
+                    robberAction(true);
+                    break;
+                case TROUBLEMAKER:
+                    troublemakerAction(true);
+                    break;
+                case DRUNK:
+                    drunkAction(true);
+                    break;
+            }
         }
 
-
+        printToAllExcept(null, "Doppelganger. Close your eyes.");
     }
 
     public void werewolfAction() {
-        printToAllExcept(null, "Werewolves, open your eyes.");
+        printToAllExcept(null, "Werewolves. Open your eyes.");
 
         ArrayList<Player> werewolves = getPlayersByRoleName("Werewolf", false);
+        ArrayList<Player> doppelgangers = getPlayersByRoleName("Doppelganger", false);
+        if (doppelgangers.size() > 0 && doppelgangers.get(0).getNewRole() == Role.WEREWOLF && !doppelgangers.get(0).isDoppelgangerRobber()) { // We don't want doppelganger-robber to wake up
+            werewolves.add(doppelgangers.get(0));
+        }
         if (werewolves.size() == 1) {
             Player werewolfPlayer = werewolves.get(0);
             werewolfPlayer.printToPlayer("You are the lone wolf. Would you like to view a center card? (y/n)");
@@ -282,21 +336,36 @@ public class Server {
                 for (Player werewolfPlayer : werewolves) {
                     werewolfPlayer.printToPlayer("There are two werewolves. The other werewolf is " + werewolves.get(1-werewolves.indexOf(werewolfPlayer)).getName() + ".");
                 }
+            } else if (werewolves.size() == 3) { // Account for doppelganger-werewolf
+                for (Player werewolfPlayer : werewolves) {
+                    werewolfPlayer.printToPlayer("There are three werewolves (including a doppelganger-werewolf). The other werewolves are:");
+                    for (Player otherWerewolf : werewolves) {
+                        if (otherWerewolf != werewolfPlayer)
+                            werewolfPlayer.printToPlayer(otherWerewolf.getName());
+                    }
+                }
             }
             delay(Role.WEREWOLF.getTurnTime(), false);
         }
 
-        printToAllExcept(null, "Werewolves, close your eyes.");
+        printToAllExcept(null, "Werewolves. Close your eyes.");
     }
 
-    public void minionAction() {
-        printToAllExcept(null, "Minion, open your eyes.");
-
+    public void minionAction(boolean doppelgangerTurn) {
+        if (!doppelgangerTurn)
+            printToAllExcept(null, "Minion, open your eyes.");
         ArrayList<Player> minions = getPlayersByRoleName("Minion", false);
         ArrayList<Player> werewolves = getPlayersByRoleName("Werewolf", false);
+        ArrayList<Player> doppelgangers = getPlayersByRoleName("Doppelganger", false);
+        // Check for doppelganger-werewolf (NOT DOPPELGANGER-ROBBER!)
+        if (doppelgangers.size() > 0 && doppelgangers.get(0).getNewRole() == Role.WEREWOLF && !doppelgangers.get(0).isDoppelgangerRobber()) {
+            werewolves.add(doppelgangers.get(0));
+        }
 
         if (minions.size() > 0) {
             Player minionPlayer = minions.get(0);
+            if (doppelgangerTurn) // If doppelganger-minion's turn
+                minionPlayer = getPlayersByRoleName("Doppelganger", false).get(0);
             if (werewolves.size() > 0) {
                 minionPlayer.printToPlayer("The werewolves are:");
                 for (Player player : werewolves) {
@@ -307,7 +376,8 @@ public class Server {
             }
         }
         delay(Role.MINION.getTurnTime(), false);
-        printToAllExcept(null, "Minion, close your eyes.");
+        if (!doppelgangerTurn)
+            printToAllExcept(null, "Minion, close your eyes.");
     }
 
     public void masonAction() {
@@ -321,16 +391,28 @@ public class Server {
             for (Player masonPlayer : masons) {
                 masonPlayer.printToPlayer("There are two masons. The other mason is " + masons.get(1-masons.indexOf(masonPlayer)).getName() + ".");
             }
+        } else if (masons.size() == 3) { // Account for doppelganger-mason
+            for (Player masonPlayer : masons) {
+                masonPlayer.printToPlayer("There are three masons (including a doppelganger-mason). The other masons are:");
+                for (Player otherMason : masons) {
+                    if (otherMason != masonPlayer)
+                        masonPlayer.printToPlayer(otherMason.getName());
+                }
+            }
         }
+
         delay(Role.MASON.getTurnTime(), false);
         printToAllExcept(null, "Masons, close your eyes.");
     }
 
-    public void seerAction() {
-        printToAllExcept(null, "Seer. Open your eyes.");
+    public void seerAction(boolean doppelgangerTurn) {
+        if (!doppelgangerTurn)
+            printToAllExcept(null, "Seer. Open your eyes.");
         ArrayList<Player> seers = getPlayersByRoleName("Seer", false);
         if (seers.size() > 0) {
             Player seerPlayer = seers.get(0);
+            if (doppelgangerTurn) // Doppelganger-seer's turn
+                seerPlayer = getPlayersByRoleName("Doppelganger", false).get(0);
             seerPlayer.printToPlayer("Do you want to view a card from the center or another player's card (center/player)");
             boolean chooseFromCenter = seerPlayer.getValidInput(input -> input.toLowerCase().equals("center") || input.toLowerCase().equals("player"), "Type 'center' or 'player'").equals("center");
             if (chooseFromCenter) {
@@ -345,14 +427,18 @@ public class Server {
         } else {
             delay(Role.SEER.getTurnTime(), false);
         }
-        printToAllExcept(null, "Seer. Close your eyes.");
+        if (!doppelgangerTurn)
+            printToAllExcept(null, "Seer. Close your eyes.");
     }
 
-    public void robberAction() {
-        printToAllExcept(null, "Robber. Open your eyes.");
+    public void robberAction(boolean doppelgangerTurn) {
+        if (!doppelgangerTurn)
+            printToAllExcept(null, "Robber. Open your eyes.");
         ArrayList<Player> robbers = getPlayersByRoleName("Robber", false);
         if (robbers.size() > 0) {
             Player robberPlayer = robbers.get(0);
+            if (doppelgangerTurn) // Doppelganger-robber's turn
+                robberPlayer = getPlayersByRoleName("Doppelganger", false).get(0);
             robberPlayer.printToPlayer("Choose a player to swap your role with. Type /players to view who the other players are.");
             Player candidatePlayer = getPlayerFromInputExceptThemselves(robberPlayer);
 
@@ -365,14 +451,18 @@ public class Server {
         } else {
             delay(Role.ROBBER.getTurnTime(), false);
         }
-        printToAllExcept(null, "Robber. Close your eyes.");
+        if (!doppelgangerTurn)
+            printToAllExcept(null, "Robber. Close your eyes.");
     }
 
-    public void troublemakerAction() {
-        printToAllExcept(null, "Troublemaker. Open your eyes.");
+    public void troublemakerAction(boolean doppelgangerTurn) {
+        if (!doppelgangerTurn)
+            printToAllExcept(null, "Troublemaker. Open your eyes.");
         ArrayList<Player> troublemakers = getPlayersByRoleName("Troublemaker", false);
         if (troublemakers.size() > 0) {
             Player troublemakerPlayer = troublemakers.get(0);
+            if (doppelgangerTurn) // Account for doppelganger-troublemaker
+                troublemakerPlayer = getPlayersByRoleName("Doppelganger", false).get(0);
             // Choose first player
             troublemakerPlayer.printToPlayer("Choose the first player. Type /players to view who the other players are.");
             Player firstPlayer = getPlayerFromInputExceptThemselves(troublemakerPlayer);
@@ -392,32 +482,44 @@ public class Server {
         } else {
             delay(Role.TROUBLEMAKER.getTurnTime(), false);
         }
+        if (!doppelgangerTurn)
+            printToAllExcept(null, "Troublemaker. Close your eyes.");
     }
 
-    public void drunkAction() {
-        printToAllExcept(null, "Drunk. Open your eyes.");
+    public void drunkAction(boolean doppelgangerTurn) {
+        if (!doppelgangerTurn)
+            printToAllExcept(null, "Drunk. Open your eyes.");
         ArrayList<Player> drunks = getPlayersByRoleName("Drunk", false);
         if (drunks.size() > 0) {
             Player drunkPlayer = drunks.get(0);
+            if (doppelgangerTurn) // Account for doppelganger-drunk
+                drunkPlayer = getPlayersByRoleName("Doppelganger", false).get(0);
             drunkPlayer.printToPlayer("What card from the center would you like to swap with? (1-3)");
             int selection = Integer.parseInt(drunkPlayer.getValidInput(Player::validIntFromOneToThree, "Must be an integer from 1 to 3."));
+            Role previousRole = drunkPlayer.getNewRole();
             drunkPlayer.setNewRole(centerRoles.get(selection-1));
-            centerRoles.set(selection-1, Role.DRUNK);
+            centerRoles.set(selection-1, previousRole);
             drunkPlayer.printToPlayer("You swapped your role with that of card " + selection + "...");
+        } else {
+            delay(Role.DRUNK.getTurnTime(), false);
         }
-        delay(Role.DRUNK.getTurnTime(), false);
-        printToAllExcept(null, "Drunk. Close your eyes.");
+        if (!doppelgangerTurn)
+            printToAllExcept(null, "Drunk. Close your eyes.");
     }
 
-    public void insomniacAction() {
-        printToAllExcept(null, "Insomniac. Open your eyes.");
+    public void insomniacAction(boolean doppelgangerTurn) {
+        if (!doppelgangerTurn)
+            printToAllExcept(null, "Insomniac. Open your eyes.");
         ArrayList<Player> insomniacs = getPlayersByRoleName("Insomniac", false);
         if (insomniacs.size() > 0) {
             Player insomniacPlayer = insomniacs.get(0);
+            if (doppelgangerTurn) // Account for doppelganger-insomniac
+                insomniacPlayer = getPlayersByRoleName("Doppelganger", false).get(0);
             insomniacPlayer.printToPlayer("Your current role is " + insomniacPlayer.getNewRole().getName());
         }
         delay(Role.INSOMNIAC.getTurnTime(), false);
-        printToAllExcept(null, "Insomniac. Close your eyes.");
+        if (!doppelgangerTurn)
+            printToAllExcept(null, "Insomniac. Close your eyes.");
     }
 
     public static void main(String[] args) {
