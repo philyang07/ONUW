@@ -10,7 +10,7 @@ public enum Role {
     VILLAGER ("Villager", 0),
     TANNER ("Tanner", 0),
     HUNTER ("Hunter", 0),
-    DOPPELGANGER("Doppelganger", 0);
+    DOPPELGANGER("Doppelganger", 8);
 
     private final String name;
     private final int turnTime;

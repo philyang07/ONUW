@@ -1,18 +1,21 @@
+import javafx.application.Platform;
+
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class Server {
+public class Server implements Runnable {
     public static final int DISCUSSION_DURATION = 20;
     public static final int VOTING_DURATION = 20;
     public static final int ADDITIONAL_NAME_ENTERING_TIME = 10;
-    public static final int NUM_PLAYERS = 5;
 
     private final int portNumber;
     private final ArrayList<Player> players;
+    private final ArrayList<Role> roleList;
     private ArrayList<Role> centerRoles;
+    private ServerSocket serverSocket;
 
     public void delay(int secs, boolean showHalfTime) {
         try {
@@ -87,25 +90,32 @@ public class Server {
         return playerNames.toString();
     }
 
-    public Server(int portNumber) {
+    public Server(int portNumber, ArrayList<Role> roleList) {
         this.portNumber = portNumber;
         this.players = new ArrayList<>();
+        this.roleList = roleList;
+    }
 
+    @Override
+    public void run() {
         acceptConnections();
         assignRoles();
         printRoles();
         performNightActions();
         printRoles();
-
-        while (true) {}
+        try {
+            serverSocket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public void acceptConnections() {
         try {
-            ServerSocket serverSocket = new ServerSocket(portNumber);
+            serverSocket = new ServerSocket(portNumber);
             Player player;
             ClientThread ct;
-            for (int i = 0; i < NUM_PLAYERS; i++) {
+            for (int i = 0; i < roleList.size()-3; i++) { // Number of players is 3 less than the number of roles
                 Socket clientSocket = serverSocket.accept();
                 ct = new ClientThread(this, clientSocket);
                 player = new Player(ct);
@@ -129,12 +139,8 @@ public class Server {
     }
 
     public void assignRoles() {
-        // Determine the role list (must be three more than the no. of players)
-        Role[] roles = {Role.WEREWOLF, Role.MINION, Role.DOPPELGANGER, Role.ROBBER, Role.DRUNK, Role.TROUBLEMAKER, Role.SEER, Role.VILLAGER};
-        List<Role> roleList = Arrays.asList(roles);
-
         // Assign to the players based on the role list
-//        Collections.shuffle(roleList);
+        Collections.shuffle(roleList);
         int i = 0;
         for (Player player : players) {
             player.setOldRole(roleList.get(i++));
@@ -308,6 +314,8 @@ public class Server {
                     drunkAction(true);
                     break;
             }
+        } else {
+            delay(Role.DOPPELGANGER.getTurnTime(), false);
         }
 
         printToAllExcept(null, "Doppelganger. Close your eyes.");
@@ -318,7 +326,7 @@ public class Server {
 
         ArrayList<Player> werewolves = getPlayersByRoleName("Werewolf", false);
         ArrayList<Player> doppelgangers = getPlayersByRoleName("Doppelganger", false);
-        if (doppelgangers.size() > 0 && doppelgangers.get(0).getNewRole() == Role.WEREWOLF && !doppelgangers.get(0).isDoppelgangerRobber()) { // We don't want doppelganger-robber to wake up
+        if (doppelgangers.size() > 0 && doppelgangers.get(0).getNewRole() == Role.WEREWOLF && doppelgangers.get(0).hasNoDoppelgangerRobber()) { // We don't want doppelganger-robber to wake up
             werewolves.add(doppelgangers.get(0));
         }
         if (werewolves.size() == 1) {
@@ -358,7 +366,7 @@ public class Server {
         ArrayList<Player> werewolves = getPlayersByRoleName("Werewolf", false);
         ArrayList<Player> doppelgangers = getPlayersByRoleName("Doppelganger", false);
         // Check for doppelganger-werewolf (NOT DOPPELGANGER-ROBBER!)
-        if (doppelgangers.size() > 0 && doppelgangers.get(0).getNewRole() == Role.WEREWOLF && !doppelgangers.get(0).isDoppelgangerRobber()) {
+        if (doppelgangers.size() > 0 && doppelgangers.get(0).getNewRole() == Role.WEREWOLF && doppelgangers.get(0).hasNoDoppelgangerRobber()) {
             werewolves.add(doppelgangers.get(0));
         }
 
@@ -523,6 +531,6 @@ public class Server {
     }
 
     public static void main(String[] args) {
-        new Server(3333);
+//        new Server(3333);
     }
 }

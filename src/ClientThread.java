@@ -54,9 +54,9 @@ public class ClientThread extends Thread {
         }
     }
 
-    // Sends a message to everyone but the current player
+    // Sends a message to everyone (including the current player)
     private void chat(String msg) {
-        server.printToAllExcept(player, player.getName() + ": " + msg);
+        server.printToAllExcept(null, player.getName() + ": " + msg);
     }
 
     private void processInput(String input) {
@@ -101,6 +101,7 @@ public class ClientThread extends Thread {
                 currentInput = (String) in.readObject();
             } catch (IOException | ClassNotFoundException e) {
                 e.printStackTrace();
+                break;
             }
             processInput(currentInput);
         }

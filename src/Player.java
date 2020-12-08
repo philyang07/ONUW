@@ -20,8 +20,8 @@ public class Player {
         return newRole;
     }
 
-    public boolean isDoppelgangerRobber() {
-        return isDoppelgangerRobber;
+    public boolean hasNoDoppelgangerRobber() {
+        return !isDoppelgangerRobber;
     }
 
     public void setDoppelgangerRobber(boolean doppelgangerRobber) {
