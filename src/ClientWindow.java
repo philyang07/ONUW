@@ -36,20 +36,9 @@ public class ClientWindow extends Stage {
         outputArea.appendText(output + "\n");
     }
 
-    private void processDisconnection() {
-        Platform.runLater(() -> {
-            new Alert(Alert.AlertType.ERROR, "Connection error.").showAndWait();
-            close();
-        });
-    }
-
-    private void closeClient() {
+    private void closeClient() { // Needs to close the socket so the server knows the client has disconnected
         try {
-            if (out != null)
-                out.close();
-            if (in != null)
-                in.close();
-            if (socket != null)
+            if (socket != null && !socket.isClosed())
                 socket.close();
         } catch (IOException e) {
             e.printStackTrace();
@@ -59,16 +48,14 @@ public class ClientWindow extends Stage {
     @Override
     public void close() {
         Platform.runLater(super::close);
-        closeClient();
     }
 
     private void enterAction() {
         try {
             out.writeObject(getInputField().getText());
             getInputField().clear();
-        } catch (IOException e) {
-            e.printStackTrace();
-            processDisconnection();
+        } catch (IOException ignored) {
+
         }
     }
 
@@ -90,12 +77,17 @@ public class ClientWindow extends Stage {
                     Platform.runLater(() -> new Alert(Alert.AlertType.ERROR, "Invalid IP provided.").showAndWait());
                     close();
                 } else if (e instanceof SocketException) {
-                    if (e instanceof ConnectException)
+                    if (e instanceof ConnectException) { // Can't get into server
                         Platform.runLater(() -> new Alert(Alert.AlertType.ERROR, "Server not open or full.").showAndWait());
-                    close();
-                } else {
-                    processDisconnection();
+                        close();
+                    } else { // Due to server disconnecting (not the output stream) (mid-way through) OR disconnecting by self-closure
+                        Platform.runLater(() -> outputArea.appendText("Disconnected from server."));
+                    }
+                } else { // Due to reading from the output stream (not the server disconnect) (happens at the very end)
+                    Platform.runLater(() -> outputArea.appendText("Disconnected from server."));
                 }
+            } finally {
+                closeClient();
             }
         }).start();
     }
@@ -116,7 +108,10 @@ public class ClientWindow extends Stage {
             outputToWindow(inputField.getText());
             inputField.clear();
         });
-        setOnCloseRequest(event -> closeClient());
+        setOnCloseRequest(event -> {
+            if (!socket.isClosed())
+                closeClient();
+        });
 
         grid.add(outputArea, 0, 0, 4, 1);
         grid.add(inputField, 0, 1, 3, 1);

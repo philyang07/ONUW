@@ -107,10 +107,12 @@ public class Server implements Runnable {
     public void run() {
         try {
             acceptConnections();
-//        assignRoles();
-//        printRoles();
-//        performNightActions();
-//        printRoles();
+            assignRoles();
+            performNightActions();
+            discussion();
+            voting();
+            results();
+            printRoles();
             printToAllExcept(null, "The server will close in 10 seconds.");
             delay(10, false);
             closeSockets();
@@ -129,18 +131,23 @@ public class Server implements Runnable {
     public void acceptConnections() throws IOException {
         Player player;
         ClientThread ct;
+        int i = 1; // Keeps track of the player's name
         while (players.size() < roleList.size()-3) { // Number of players is 3 less than the number of roles
             Socket clientSocket = serverSocket.accept();
             ct = new ClientThread(this, clientSocket);
             player = new Player(ct);
             ct.setPlayer(player); // so the ClientThread can access Player for the discussion part
-            player.setName("Player " + (players.size()+1));
+
+            // Assign the new player a name (account for player leaving)
+            player.setName("Player " + (i++));
+
             players.add(player);
             ct.start();
 
             // Allow players to enter their names until 10 seconds after the voting period
             ct.setStillEnteringNames(true);
             player.printToPlayer("Welcome " + player.getName() + ". You can change your name if you like via /name <name>");
+            printToAllExcept(player, "A player joined the server.");
         }
         serverSocket.close();
         printToAllExcept(null, "You have " + ADDITIONAL_NAME_ENTERING_TIME + " seconds left to change your name");
@@ -166,17 +173,26 @@ public class Server implements Runnable {
 
     public void performNightActions() {
         printToAllExcept(null, "Everyone. Close your eyes.");
-        doppelgangerAction();
-        werewolfAction();
-        minionAction(false);
-        masonAction();
-        seerAction(false);
-        robberAction(false);
-        troublemakerAction(false);
-        drunkAction(false);
-        insomniacAction(false);
+        if (roleList.contains(Role.DOPPELGANGER))
+            doppelgangerAction();
+        if (roleList.contains(Role.WEREWOLF))
+            werewolfAction();
+        if (roleList.contains(Role.MINION))
+            minionAction(false);
+        if (roleList.contains(Role.MASON))
+            masonAction();
+        if (roleList.contains(Role.SEER))
+            seerAction(false);
+        if (roleList.contains(Role.ROBBER))
+            robberAction(false);
+        if (roleList.contains(Role.TROUBLEMAKER))
+            troublemakerAction(false);
+        if (roleList.contains(Role.DRUNK))
+            drunkAction(false);
+        if (roleList.contains(Role.INSOMNIAC))
+            insomniacAction(false);
         // Add doppelganger-insomniac if playing with doppelganger
-        if (getPlayersByRoleName("Doppelganger", false).size() > 0 || centerRoles.contains(Role.DOPPELGANGER)) {
+        if (roleList.contains(Role.DOPPELGANGER)) {
             printToAllExcept(null, "Doppelganger-insomniac. Open your eyes.");
             insomniacAction(true);
             printToAllExcept(null, "Doppelganger-insomniac. Close your eyes.");
@@ -258,26 +274,27 @@ public class Server implements Runnable {
                 for (Player player : tanners) // Accounting for potential doppelganger-tanner
                     player.printToPlayer("You didn't die and so you didn't win...");
         } else {
-            // Hunter action (assume swapping into hunter counts)
-            for (Player hunterPlayer : votedOutPlayers) {
-                if (hunterPlayer.getNewRole() == Role.HUNTER) {
-                    if (hunterPlayer.getOldRole() == Role.DOPPELGANGER) {
-                        printToAllExcept(null, "The hunter (doppelganger)'" + hunterPlayer.getName() + "' was voted out!");
-                    } else {
-                        printToAllExcept(null, "The hunter '" + hunterPlayer.getName() + "' was voted out!");
-                    }
-                    if (hunterPlayer.getVotedPlayer() != null) {
-                        printToAllExcept(null, "Their target " + hunterPlayer.getVotedPlayer() + " will also die.");
-                        if (!votedOutPlayers.contains(hunterPlayer.getVotedPlayer())) {
-                            deadPlayers.add(hunterPlayer.getVotedPlayer());
+            if (roleList.contains(Role.HUNTER))
+                // Hunter action (assume swapping into hunter counts)
+                for (Player hunterPlayer : votedOutPlayers) {
+                    if (hunterPlayer.getNewRole() == Role.HUNTER) {
+                        if (hunterPlayer.getOldRole() == Role.DOPPELGANGER) {
+                            printToAllExcept(null, "The hunter (doppelganger)'" + hunterPlayer.getName() + "' was voted out!");
                         } else {
-                            printToAllExcept(null, "However, they were already voted out.");
+                            printToAllExcept(null, "The hunter '" + hunterPlayer.getName() + "' was voted out!");
                         }
-                    } else {
-                        printToAllExcept(null, "But they didn't target anyone... So no-one else dies.");
+                        if (hunterPlayer.getVotedPlayer() != null) {
+                            printToAllExcept(null, "Their target " + hunterPlayer.getVotedPlayer() + " will also die.");
+                            if (!votedOutPlayers.contains(hunterPlayer.getVotedPlayer())) {
+                                deadPlayers.add(hunterPlayer.getVotedPlayer());
+                            } else {
+                                printToAllExcept(null, "However, they were already voted out.");
+                            }
+                        } else {
+                            printToAllExcept(null, "But they didn't target anyone... So no-one else dies.");
+                        }
                     }
                 }
-            }
 
             if (currentWerewolves.stream().anyMatch(deadPlayers::contains)) {
                 printToAllExcept(null, "At least one werewolf died! Villagers win!");

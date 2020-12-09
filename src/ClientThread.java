@@ -112,7 +112,7 @@ public class ClientThread extends Thread {
             } catch (IOException | ClassNotFoundException e) {
                 if (stillEnteringNames)
                     server.removePlayer(player);
-                server.printToAllExcept(null, player.getName() + " left the game. Restart the server if game has started.");
+                server.printToAllExcept(player, player.getName() + " left the game. Restart the server if game has started.");
                 break;
             }
             processInput(currentInput);
