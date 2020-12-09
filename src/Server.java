@@ -97,7 +97,7 @@ public class Server implements Runnable {
         this.serverSocket = serverSocket;
     }
 
-    private void closeSockets() throws IOException {
+    private void closeSockets() {
         for (Player player : players) {
             player.closePlayerClient();
         }

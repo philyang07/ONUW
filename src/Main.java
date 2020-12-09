@@ -1,6 +1,5 @@
 import javafx.application.Application;
 import javafx.application.Platform;
-import javafx.concurrent.Task;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
@@ -9,12 +8,10 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.GridPane;
 import javafx.stage.Stage;
-import javafx.stage.WindowEvent;
 
 import java.io.IOException;
 import java.net.BindException;
 import java.net.ServerSocket;
-import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.Arrays;
 
@@ -35,10 +32,6 @@ public class Main extends Application {
         Role.DRUNK,
         Role.INSOMNIAC
     ));
-
-    private static void handle(WindowEvent event) {
-        System.exit(0);
-    }
 
     private void openServer() throws IOException {
         ServerSocket serverSocket = new ServerSocket(PORT_NUMBER);

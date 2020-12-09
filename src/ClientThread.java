@@ -9,7 +9,7 @@ public class ClientThread extends Thread {
     private ObjectOutputStream out;
     private String currentInput;
     private final Server server;
-    private Socket clientSocket;
+    private final Socket clientSocket;
 
     private boolean inDiscussion;
     private boolean inVoting;
