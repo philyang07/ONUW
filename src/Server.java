@@ -1,5 +1,3 @@
-import javafx.application.Platform;
-
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -11,11 +9,10 @@ public class Server implements Runnable {
     public static final int VOTING_DURATION = 20;
     public static final int ADDITIONAL_NAME_ENTERING_TIME = 10;
 
-    private final int portNumber;
     private final ArrayList<Player> players;
     private final ArrayList<Role> roleList;
     private ArrayList<Role> centerRoles;
-    private ServerSocket serverSocket;
+    private final ServerSocket serverSocket;
 
     public void delay(int secs, boolean showHalfTime) {
         try {
@@ -45,6 +42,10 @@ public class Server implements Runnable {
                 return true;
         }
         return false;
+    }
+
+    public void removePlayer(Player player) {
+        players.remove(player);
     }
 
     public Player getPlayer(String name) {
@@ -90,51 +91,62 @@ public class Server implements Runnable {
         return playerNames.toString();
     }
 
-    public Server(int portNumber, ArrayList<Role> roleList) {
-        this.portNumber = portNumber;
+    public Server(ServerSocket serverSocket, ArrayList<Role> roleList) {
         this.players = new ArrayList<>();
         this.roleList = roleList;
+        this.serverSocket = serverSocket;
+    }
+
+    private void closeSockets() throws IOException {
+        for (Player player : players) {
+            player.closePlayerClient();
+        }
     }
 
     @Override
     public void run() {
-        acceptConnections();
-        assignRoles();
-        printRoles();
-        performNightActions();
-        printRoles();
         try {
-            serverSocket.close();
-        } catch (IOException e) {
+            acceptConnections();
+//        assignRoles();
+//        printRoles();
+//        performNightActions();
+//        printRoles();
+            printToAllExcept(null, "The server will close in 10 seconds.");
+            delay(10, false);
+            closeSockets();
+        } catch (IOException e) { // Close the server socket if any errors occur
+            if (!serverSocket.isClosed()) {
+                try {
+                    serverSocket.close();
+                } catch (IOException ioException) {
+                    ioException.printStackTrace();
+                }
+            }
             e.printStackTrace();
         }
     }
 
-    public void acceptConnections() {
-        try {
-            serverSocket = new ServerSocket(portNumber);
-            Player player;
-            ClientThread ct;
-            for (int i = 0; i < roleList.size()-3; i++) { // Number of players is 3 less than the number of roles
-                Socket clientSocket = serverSocket.accept();
-                ct = new ClientThread(this, clientSocket);
-                player = new Player(ct);
-                ct.setPlayer(player); // so the ClientThread can access Player for the discussion part
-                player.setName("Player " + (i+1));
-                players.add(player);
-                ct.start();
+    public void acceptConnections() throws IOException {
+        Player player;
+        ClientThread ct;
+        while (players.size() < roleList.size()-3) { // Number of players is 3 less than the number of roles
+            Socket clientSocket = serverSocket.accept();
+            ct = new ClientThread(this, clientSocket);
+            player = new Player(ct);
+            ct.setPlayer(player); // so the ClientThread can access Player for the discussion part
+            player.setName("Player " + (players.size()+1));
+            players.add(player);
+            ct.start();
 
-                // Allow players to enter their names until 10 seconds after the voting period
-                ct.setStillEnteringNames(true);
-                player.printToPlayer("Welcome " + player.getName() + ". You can change your name if you like via /name <name>");
-            }
-            printToAllExcept(null, "You have " + ADDITIONAL_NAME_ENTERING_TIME + " seconds left to change your name");
-            delay(ADDITIONAL_NAME_ENTERING_TIME, true);
-            for (Player p : players) {
-                p.stopEnteringNames();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
+            // Allow players to enter their names until 10 seconds after the voting period
+            ct.setStillEnteringNames(true);
+            player.printToPlayer("Welcome " + player.getName() + ". You can change your name if you like via /name <name>");
+        }
+        serverSocket.close();
+        printToAllExcept(null, "You have " + ADDITIONAL_NAME_ENTERING_TIME + " seconds left to change your name");
+        delay(ADDITIONAL_NAME_ENTERING_TIME, true);
+        for (Player p : players) {
+            p.stopEnteringNames();
         }
     }
 

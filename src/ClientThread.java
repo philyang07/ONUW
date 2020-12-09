@@ -9,6 +9,7 @@ public class ClientThread extends Thread {
     private ObjectOutputStream out;
     private String currentInput;
     private final Server server;
+    private Socket clientSocket;
 
     private boolean inDiscussion;
     private boolean inVoting;
@@ -30,8 +31,17 @@ public class ClientThread extends Thread {
         this.player = player;
     }
 
+    public void closeClientThread() {
+        try {
+            clientSocket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     public ClientThread(Server server, Socket clientSocket) {
         this.server = server;
+        this.clientSocket = clientSocket;
         this.currentInput = "";
         try {
             in = new ObjectInputStream(clientSocket.getInputStream());
@@ -50,7 +60,7 @@ public class ClientThread extends Thread {
         try {
             out.writeObject(message);
         } catch (IOException e) {
-            e.printStackTrace();
+//            e.printStackTrace();
         }
     }
 
@@ -100,7 +110,9 @@ public class ClientThread extends Thread {
             try {
                 currentInput = (String) in.readObject();
             } catch (IOException | ClassNotFoundException e) {
-                e.printStackTrace();
+                if (stillEnteringNames)
+                    server.removePlayer(player);
+                server.printToAllExcept(null, player.getName() + " left the game. Restart the server if game has started.");
                 break;
             }
             processInput(currentInput);

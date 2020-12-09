@@ -13,6 +13,10 @@ public class Player {
         return oldRole;
     }
 
+    public void closePlayerClient() {
+        clientThread.closeClientThread();
+    }
+
     // Returns new role if they have a new role, otherwise, return old role
     public Role getNewRole() {
         if (newRole == null)
@@ -88,14 +92,14 @@ public class Player {
     public String getInput() {
         String oldInput = this.clientThread.getCurrentInput();
         // Wait until found
-        while (this.clientThread.getCurrentInput().equals(oldInput) || this.clientThread.getCurrentInput().charAt(0) == '/') { // Ignore inputs that begin with a '/'
-            // Just do something while waiting...
+        // Ignore inputs that begin with a '/'
+        // Just do something while waiting...
+        while (this.clientThread.getCurrentInput().equals(oldInput) || this.clientThread.getCurrentInput().charAt(0) == '/')
             try {
                 Thread.sleep(50);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-        }
         return this.clientThread.getCurrentInput();
     }
 
