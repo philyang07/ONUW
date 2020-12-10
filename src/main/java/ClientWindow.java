@@ -109,7 +109,7 @@ public class ClientWindow extends Stage {
             inputField.clear();
         });
         setOnCloseRequest(event -> {
-            if (!socket.isClosed())
+            if (socket != null && !socket.isClosed())
                 closeClient();
         });
 
